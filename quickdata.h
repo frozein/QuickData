@@ -12,7 +12,7 @@
  * GENERAL NOTES:
  * 
  * to change or disable the function prefix (the default is "qd_"), change the macro on
- * line 135 to contain the desired prefix, or "#define QD_PREFIX" for no prefix
+ * line 147 to contain the desired prefix, or "#define QD_PREFIX" for no prefix
  * 
  * if you wish to provide your own memory allocation functions, #define QD_MALLOC, QD_FREE,
  * and QD_REALLOC to your desired functions before including this file
@@ -27,12 +27,7 @@
  * 		- optional parameter for most data structures, if passed as NULL, memcpy will be used
  * 		- copies src to dest, and ACTS AS A DESTRUCTOR WHEN dest == NULL
  * 
- * qd_ordering_t is an enum that can take three value:
- * 		- QD_LT (less than)
- * 		- QD_EQ (equal to)
- * 		- QD_GT (greater than)
- * 
- * qd_ordering_t (*QDcompareFunc)(void* left, void* right)
+ * int32_t (*QDcompareFunc)(void* left, void* right)
  * 		- required parameter for some datas tructures/functions
  *		- returns a negative number if left < right, 0 if left == right, and 
  *			a positive number if left > right
@@ -168,22 +163,18 @@ extern "C"
 //STRUCT DECLARATIONS:
 
 typedef void (*QDcopyFunc)(void*, void*);
+typedef int32_t (*QDcompareFunc)(void*, void*);
+typedef uint64_t (*QDhashFunc)(void*);
 
+//boolean return type
 typedef enum qd_bool_t
 {
 	QD_TRUE = 1,
 	QD_FALSE = 0
 } qd_bool_t;
 
-typedef enum qd_ordering_t 
-{
-	QD_LT,
-	QD_EQ,
-	QD_GT
-} qd_ordering_t;
-
-typedef qd_ordering_t (*QDcompareFunc)(void*, void*);
-typedef uint64_t (*QDhashFunc)(void*);
+//iterator
+typedef size_t qd_iterator_t;
 
 //a dynamically-sized array
 typedef struct QDdynArray
@@ -214,9 +205,6 @@ typedef struct QDhashmap
 	size_t valSize;
 	void* vals;
 } QDhashmap;
-
-//hashmap iterator
-typedef size_t qd_iterator_t;
 
 //a deque (queue that can be popped from start or end, basically a queue+stack)
 typedef struct QDdeque
@@ -1287,10 +1275,10 @@ void QD_PREFIX(tree_insert)(QDrbTree* rbTree, void* elem)
 	while (currPtr)
 	{
 		prevPtr = currPtr;
-		qd_ordering_t cmp = rbTree->compare(elem, currPtr->data);
-		if (cmp == QD_LT)
+		int32_t cmp = rbTree->compare(elem, currPtr->data);
+		if (cmp < 0)
 			currPtr = currPtr->l;
-		else if (cmp == QD_GT)
+		else if (cmp > 0)
 			currPtr = currPtr->r;
 	}
 
@@ -1353,7 +1341,7 @@ void QD_PREFIX(tree_insert)(QDrbTree* rbTree, void* elem)
 	nodeToInsert->parent = prevPtr;
 	if (!prevPtr)
 		rbTree->root = nodeToInsert;
-	else if (rbTree->compare(nodeToInsert->data, prevPtr->data) == QD_LT)
+	else if (rbTree->compare(nodeToInsert->data, prevPtr->data) < 0)
 		prevPtr->l = nodeToInsert;
 	else
 		prevPtr->r = nodeToInsert;
@@ -1435,18 +1423,13 @@ QDtreeNode* QD_PREFIX(tree_find)(QDrbTree* rbTree, void* elem)
 	QDtreeNode* it = rbTree->root;
 	while (it)
 	{
-		qd_ordering_t cmp = rbTree->compare(elem, it->data);
-		switch (cmp)
-		{
-		case QD_EQ:
+		int32_t cmp = rbTree->compare(elem, it->data);
+		if(cmp == 0)
 			return it;
-		case QD_LT:
+		else if(cmp < 0)
 			it = it->l;
-			break;
-		case QD_GT:
+		else if(cmp > 0)
 			it = it->r;
-			break;
-		}
 	}
 
 	return NULL;
