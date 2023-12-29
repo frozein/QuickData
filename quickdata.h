@@ -848,7 +848,7 @@ void QD_PREFIX(hashmap_insert)(QDhashmap* map, void* key, void* val)
 		newMap.valCopy = NULL; //mem leaks in case user-supplied copy function makes allocs
 		for(size_t i = 0; i < map->cap; i++)
 			if(map->keysValid[i])
-				QD_PREFIX(hashmap_insert)(&newMap, map->keys + i * map->keySize, map->vals + i * map->valSize);
+				QD_PREFIX(hashmap_insert)(&newMap, (char*)map->keys + i * map->keySize, (char*)map->vals + i * map->valSize);
 
 		newMap.keyCopy = map->keyCopy;
 		newMap.valCopy = map->valCopy;
@@ -1032,7 +1032,7 @@ void QD_PREFIX(ll_free)(QDlinkedList* list)
 
 void QD_PREFIX(ll_insert)(QDlinkedList* list, QDllNode* pred, void* elem)
 {
-	size_t buffIdx = list->firstFree.buffIdx;
+	int32_t buffIdx = list->firstFree.buffIdx;
 	size_t blockIdx = list->firstFree.blockIdx;
 
 	list->firstFree = list->nodeBuffs[buffIdx][blockIdx].next;
@@ -1061,7 +1061,7 @@ void QD_PREFIX(ll_insert)(QDlinkedList* list, QDllNode* pred, void* elem)
 
 	if(list->firstFree.blockIdx == QD_BLOCK_NULL)
 	{
-		size_t numBuffs = 1;
+		int32_t numBuffs = 1;
 		size_t tmp = list->cap;
 		while(tmp >>= 1)
 			numBuffs++;
@@ -1091,7 +1091,7 @@ void QD_PREFIX(ll_insert)(QDlinkedList* list, QDllNode* pred, void* elem)
 
 void QD_PREFIX(ll_remove)(QDlinkedList* list, QDllNode* node)
 {
-	size_t buffIdx = node->buffIdx;
+	int32_t buffIdx = node->buffIdx;
 	size_t blockIdx = ((char*)node - (char*)list->nodeBuffs[buffIdx]) / sizeof(_QDllBlock);
 
 	size_t buffSize = 1;
@@ -1128,7 +1128,7 @@ void QD_PREFIX(ll_remove)(QDlinkedList* list, QDllNode* node)
 
 QDrbTree* QD_PREFIX(tree_create)(size_t elemSize, QDcopyFunc copy, QDcompareFunc compare)
 {
-	QDrbTree* rbTree = QD_MALLOC(sizeof(QDrbTree));
+	QDrbTree* rbTree = (QDrbTree*)QD_MALLOC(sizeof(QDrbTree));
 	if (!rbTree)
 		return NULL;
 
@@ -1143,11 +1143,11 @@ QDrbTree* QD_PREFIX(tree_create)(size_t elemSize, QDcopyFunc copy, QDcompareFunc
 	rbTree->buffCount = 1;
 	rbTree->buffCapacity = 1;
 
-	rbTree->nodeBuff = QD_MALLOC(sizeof(QDtreeNodeBlock*));
-	rbTree->nodeBuff[0] = QD_MALLOC(sizeof(QDtreeNodeBlock));
+	rbTree->nodeBuff = (QDtreeNodeBlock**)QD_MALLOC(sizeof(QDtreeNodeBlock*));
+	rbTree->nodeBuff[0] = (QDtreeNodeBlock*)QD_MALLOC(sizeof(QDtreeNodeBlock));
 	rbTree->nodeBuff[0][0].nextFree = SIZE_MAX; // SIZE_MAX is equivalent to NULL, this means a resize is needed
-	rbTree->dataBuff = QD_MALLOC(sizeof(void*));
-	rbTree->dataBuff[0] = QD_MALLOC(rbTree->elemSize);
+	rbTree->dataBuff = (void**)QD_MALLOC(sizeof(void*));
+	rbTree->dataBuff[0] = (void*)QD_MALLOC(rbTree->elemSize);
 
 	if (!rbTree->nodeBuff || !rbTree->dataBuff) {
 		QD_FREE(rbTree);
@@ -1199,7 +1199,7 @@ QDtreeNode* QD_PREFIX(tree_iterate)(QDrbTree* rbTree, QDtreeNode* it)
 
 qd_bool_t QD_PREFIX(tree_iterate_finished)(QDtreeNode* it)
 {
-	return it == NULL;
+	return (qd_bool_t)(it == NULL);
 }
 
 void QD_PREFIX(tree_free)(QDrbTree* rbTree)
@@ -1314,13 +1314,13 @@ void QD_PREFIX(tree_insert)(QDrbTree* rbTree, void* elem)
 		if (rbTree->buffCount > rbTree->buffCapacity) 
 		{
 			rbTree->buffCapacity *= 2;
-			rbTree->nodeBuff = QD_REALLOC(rbTree->nodeBuff, rbTree->buffCapacity * sizeof(QDtreeNodeBlock*));
-			rbTree->dataBuff = QD_REALLOC(rbTree->dataBuff, rbTree->buffCapacity * sizeof(void*));
+			rbTree->nodeBuff = (QDtreeNodeBlock**)QD_REALLOC(rbTree->nodeBuff, rbTree->buffCapacity * sizeof(QDtreeNodeBlock*));
+			rbTree->dataBuff = (void**)QD_REALLOC(rbTree->dataBuff, rbTree->buffCapacity * sizeof(void*));
 		}
 
 		buffIdx = rbTree->buffCount - 1;
 		rbTree->dataBuff[buffIdx] = QD_MALLOC(newBufferSize * rbTree->elemSize);
-		rbTree->nodeBuff[buffIdx] = QD_MALLOC(newBufferSize * sizeof(QDtreeNodeBlock));
+		rbTree->nodeBuff[buffIdx] = (QDtreeNodeBlock*)QD_MALLOC(newBufferSize * sizeof(QDtreeNodeBlock));
 		for (size_t i = 0; i < newBufferSize; i++)
 			rbTree->nodeBuff[buffIdx][i].nextFree = (i == newBufferSize - 1) ? SIZE_MAX : oldCapacity + i + 1;
 	
